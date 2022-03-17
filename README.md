@@ -2,11 +2,12 @@
 
 ### What will I be trying to build: 
 
-For now, this is how I interpret the challenge:
+The plan to start working on this.
 
-1. Write a multisig contract with addSigner and removeSigner functions.
-2. Get the front-end working with it and understand how the project works with off-chain and on-chain transactions / steps. Hint: use of recover and understanding how hexstrings and hashes work.
-3. Pull components from scaffold-eth example repo that Chris has updated (thanks!). The front-end components will work nicely with your code.
-4. Once you get the base of the challenge done, see if I can call a function from an external contract such as uniswap swap ETH for DAI, and have your multisig owners vote on it.
+1 . Create a smart contract that has the following functions:
+      a. Add a transaction by passing to, value and hex-data
+      b. Sign a transaction without paying gas (i.e. use private key for signing)
+      c. Initiate an approved transaction by passing all the signed messages (which we had stored off-chain when each owner approved it). The txn would involve gas fees obviously, but the smart contract also checks that each of the signs that we pass as parameters is valid (i.e. the user which signed it is an owner). The smart contract checks the same by using "ecrecover".
 
-The first 3 steps... tbh you can probably just use the implementation code (smart contracts) and front-end that Chris has created. You'll have to figure out how to bring in a scanning component from punkwallet branch from scaffold-eth repo (not scaffold-eth examples repo).
+
+2. Once we have the smart contract we simply need to make sure the frontend has buttons for these functions. And we store the signed messages in a simple array/hashmap.
