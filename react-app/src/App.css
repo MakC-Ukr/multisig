@@ -36,3 +36,28 @@
     transform: rotate(360deg);
   }
 }
+
+
+.container {
+  display: grid;
+  grid-template-columns: repeat(6,1fr);
+  grid-template-rows: 100px 400px 250px ;
+  align-content: start;
+  grid-template-areas:
+    " x x title title . connect"
+    " . tab tab tab tab . "
+    " . f_name fields fields buttons . ";
+  place-items: center;
+}
+
+.title{
+  grid-area: title;
+}
+
+.connect{
+  grid-area: connect;
+}
+
+.tab{
+  grid-area: tab;
+}

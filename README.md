@@ -11,3 +11,10 @@ The plan to start working on this.
 
 
 2. Once we have the smart contract we simply need to make sure the frontend has buttons for these functions. And we store the signed messages in a simple array/hashmap.
+
+
+##### 18 March
+
+Created a react app to show connect wallet button, and a smart contracy which stores the txns on chain. 
+
+The next steps are to connect the smart contract to out frontend and start reading transactions in order to display them. 

@@ -2,6 +2,15 @@ import './App.css';
 // import {button} from 'react';
 import { useEffect, useState } from 'react';
 import Web3 from "web3";
+var React = require('react-native');
+var {
+  AppRegistry,
+  StyleSheet,
+  Text,
+  View,
+  Component
+} = React;
+
 
 let web3;
 let accounts;
@@ -21,6 +30,7 @@ if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
 
 
 function App() {
+
   const [currentAccount, setCurrentAccount] = useState(null);
   const { ethereum } = window;
 
@@ -74,8 +84,8 @@ function App() {
     console.log({ message });
 
     // hash message
-    const hashedMessage = web3.utils.sha3(message);
-    console.log({ hashedMessage });
+    const hashedMessage = web3.utils.sha3(message); // basically keccak256(message)
+    // console.log({ hashedMessage });
 
     // // sign hashed message
     const signature = await ethereum.request({
@@ -84,6 +94,7 @@ function App() {
     });
     console.log({ signature });
 
+
     // // split signature
     const r = signature.slice(0, 66);
     const s = "0x" + signature.slice(66, 130);
@@ -91,14 +102,22 @@ function App() {
     console.log({ r, s, v });
   }
 
+  // <button onClick={signMessage}>Sign Message</button>
+
+
 
   return (
-
-    <div>
-      <h1>Hello world</h1>
-      <div>
-          {currentAccount ? <h3>Wallet connected</h3> : connectWalletButton()}
-         <button onClick={signMessage}>Sign Message</button>
+    <div class="container">
+      <div class="title">
+        <h1>Multisig</h1>
+      </div>
+      <div class = "connect">
+        {currentAccount ? <h3>Wallet connected</h3> : connectWalletButton()}
+      </div>
+      <div class = "tab">
+          <h1>
+            Table here
+          </h1>
       </div>
     </div>
   );
