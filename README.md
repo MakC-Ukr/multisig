@@ -25,3 +25,11 @@ Added signing functionality to frontend. Connect Wallet button is also present.
 
 i. Proper error handling is missing. An error renders all the buttons to be not clickable. Use notifications for that
 ii. A form to add transactions is also missing. 
+
+
+##### 19 March. Part two.
+
+Approving ytansactions and proposing txns is now possible. Things left to add are:
+i. error handling
+ii. Executing txns once neccessary amounr of votes is achieved
+iii. Storing the signs off-chain (better, on servers)
