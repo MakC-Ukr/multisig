@@ -1,0 +1,7 @@
+import web3 from "./web3";
+
+const abi = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"stateMutability":"payable","type":"fallback"},{"inputs":[{"internalType":"address","name":"_to","type":"address"},{"internalType":"uint256","name":"_val","type":"uint256"},{"internalType":"bytes","name":"_txhash","type":"bytes"},{"internalType":"string","name":"_desc","type":"string"}],"name":"addTransaction","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256","name":"_index","type":"uint256"}],"name":"executeTransaction","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"qtyTxn","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"","type":"uint256"}],"name":"txns","outputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"val","type":"uint256"},{"internalType":"bytes","name":"data","type":"bytes"},{"internalType":"bool","name":"executed","type":"bool"},{"internalType":"string","name":"desc","type":"string"}],"stateMutability":"view","type":"function"},{"stateMutability":"payable","type":"receive"}];
+
+let instance = new web3.eth.Contract(abi, '0x33a6d31f8A6E4B18EC370C1aBA6B4ADBEF863E2C');
+
+export default instance;

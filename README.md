@@ -18,3 +18,10 @@ The plan to start working on this.
 Created a react app to show connect wallet button, and a smart contracy which stores the txns on chain. 
 
 The next steps are to connect the smart contract to out frontend and start reading transactions in order to display them. 
+
+
+##### 19 March
+Added signing functionality to frontend. Connect Wallet button is also present.
+
+i. Proper error handling is missing. An error renders all the buttons to be not clickable. Use notifications for that
+ii. A form to add transactions is also missing. 
