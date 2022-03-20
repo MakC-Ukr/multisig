@@ -17,6 +17,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 import "shards-ui/dist/css/shards.min.css";
 import { Form, FormInput, FormGroup, FormTextarea } from "shards-react";
 import { BigNumber } from "ethers";
+import { sign } from "crypto";
 
 let web3;
 
@@ -30,6 +31,8 @@ if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
   web3 = new Web3(provider);
 }
 
+
+
 class App extends React.Component {
   constructor(props) {
     super(props);
@@ -37,13 +40,20 @@ class App extends React.Component {
       c_Txns: [],
       txns_loaded: false,
       txns_frontend: [],
-      currentAccount: "",
+      // currentAccount: "",
       accountConnected: false,
       accounts: [],
       inputDesc: "",
       inputVal: 0,
       inputData: "",
       inputTo: "",
+      saved_signs:[],
+      qtySaved_signs: 0,
+      partnerAddresses :[],
+      partnerWalletConnected: false,
+      minVotes: 0,
+      executableTxns: [],
+      executableTxnsBOOL: false,
     };
     this.componentDidMount = this.componentDidMount.bind(this);
   }
@@ -60,9 +70,12 @@ class App extends React.Component {
     // console.log(z);
     var self = this;
     async function fetchContractData() {
+      var minVotesNeeded = await multisig.methods.minVotes().call();
       var c_qtyTxn = await multisig.methods.qtyTxn().call();
       // console.log("c_qtyTxn: ", c_qtyTxn);
       for (var i = 0; i < c_qtyTxn; i++) {
+        self.state.saved_signs.push({});
+        self.state.qtySaved_signs = self.state.qtySaved_signs+1;
         self.state.c_Txns[i] = await multisig.methods.txns(i).call();
         self.state.txns_frontend[i] = [
           <CryptoLogos
@@ -73,77 +86,111 @@ class App extends React.Component {
           self.state.c_Txns[i]["desc"],
           self.state.c_Txns[i]["to"],
           self.state.c_Txns[i]["val"],
-          // <button
-          //   // color="blue"
-          //   // id="test-button-colored-blue"
-          //   onClick={(e) => {
-          //       console.log("I= ",e.target.value);
-          //       signMessage(self.state.c_Txns[i]['data']);
-          //     }
-          //   }
-          //   // text="Approve"
-          //   // theme="colored"
-          //   // type="button"
-          //   >{i}</button>
           <Button
             onClick={async (e) => {
-              // console.log(e.target);
-              var txt = e.target.innerText;
-              // console.log("I = ", txt.slice(12,txt.length));
-              const temp_data =
-                self.state.c_Txns[txt.slice(12, txt.length)]["data"];
-              const temp_to =
-                self.state.c_Txns[txt.slice(12, txt.length)]["to"];
-              const temp_val =
-                self.state.c_Txns[txt.slice(12, txt.length)]["val"];
-              const message = temp_to + temp_val + temp_data;
-              // console.log({message});
-              const hashedMessage = web3.utils.sha3(message);
-              // console.log({ hashedMessage });
-              // const accs= await window.ethereum.request({ method: 'eth_accounts' });
-              const signature = await window.ethereum.request({
-                method: "personal_sign",
-                params: [hashedMessage, self.state.accounts[0]],
-              });
-              console.log({ signature });
-              const r = signature.slice(0, 66);
-              const s = "0x" + signature.slice(66, 130);
-              const v = parseInt(signature.slice(130, 132), 16);
-              console.log({ r, s, v });
-            }}
+                  await checkWalletIsConnected();
+                  if(self.state.partnerWalletConnected)
+                  {
+                    try
+                    {
+                      // console.log(e.target);
+                      var txt = e.target.innerText;
+                      var txn_index = txt.slice(12, txt.length);
+                      // console.log("I = ", txt.slice(12,txt.length));
+                      const temp_data =
+                        self.state.c_Txns[txt.slice(12, txt.length)]["data"];
+                      const temp_to =
+                        self.state.c_Txns[txt.slice(12, txt.length)]["to"];
+                      const temp_val =
+                        self.state.c_Txns[txt.slice(12, txt.length)]["val"];
+                      const message = web3.eth.abi.encodeParameters(
+                        ['address', 'uint256','bytes'],
+                        [temp_to, temp_val, temp_data]
+                      );
+                      // const message = /*temp_to + temp_val +*/ temp_data;
+                      console.log({message});
+                      const hashedMessage = web3.utils.sha3(message);
+                      console.log({hashedMessage});
+                      let accs = await window.ethereum.request({ method: 'eth_accounts' });
+                      const signature = await window.ethereum.request({
+                        method: "personal_sign",
+                        params: [hashedMessage, accs[0]],
+                      });
+                      // console.log({ signature });
+                      const r = signature.slice(0, 66);
+                      const s = "0x" + signature.slice(66, 130);
+                      const v = parseInt(signature.slice(130, 132), 16);
+                      self.state.saved_signs[txn_index][accs[0]] = signature;
+                      self.setState();
+                      // console.log("Added signature: ", signature, " signed by ", accs[0], " to txn_index: ", txn_index);
+                      // console.log("Saved_signs is now : ", self.state.saved_signs);
+                      // console.log({ r, s, v });
+                    }
+                    catch(err)
+                    {
+                      console.log(err);
+                    }
+                  }
+                  else
+                  {
+                    console.log("Sorry. Non-partner cannot approve transactions.");
+                  }
+              }
+            }
             text={"Approve txn " + i}
           />,
         ];
-        // console.log(i, ". to: ", self.state.c_Txns[i]['data']);
-        // console.log(i, ". desc: ", self.state.c_Txns[i]['desc']);
       }
-      self.setState({ txns_loaded: true });
+
+      var c_qtyPartners = await multisig.methods.n_partners().call();
+      for(var q = 0 ; q < c_qtyPartners; q++)
+      {
+        var _addr = await multisig.methods.partners(q).call();
+        self.state.partnerAddresses.push(_addr);
+      }
+      
+      // console.log("Partners loaded: ", self.state.partnerAddresses);
+
+      self.setState({ txns_loaded: true, minVotes: minVotesNeeded });
+
     }
 
+    const checkWalletIsConnected = async () => {
+      if (!window.ethereum) {
+          console.log("Make sure you have Metamask installed!");
+          return;
+      } else {
+          // console.log("Wallet exists! We're ready to go!")
+      }
+
+      let accounts = await window.ethereum.request({ method: 'eth_accounts' });
+
+      var partnerConn = await multisig.methods.isPartner(accounts[0]).call();
+
+      if (accounts.length !== 0) {
+        this.setState({
+          partnerWalletConnected: partnerConn,
+          // currentAccount: this.state.accounts[0],
+          accountConnected: true,
+        });
+      } else {
+          console.log("No authorized account found");
+      }
+    }
+
+    
+  
+    // checkIfTxnsCanBeExec();
+    checkWalletIsConnected();
     fetchContractData();
   }
-  // );
+
+
+
+  
+
 
   render() {
-    // const checkWalletIsConnected = async () => {
-    //   if (!ethereum) {
-    //       console.log("Make sure you have Metamask installed!");
-    //       return;
-    //   } else {
-    //       console.log("Wallet exists! We're ready to go!")
-    //   }
-
-    //   accounts = await ethereum.request({ method: 'eth_accounts' });
-
-    //   if (accounts.length !== 0) {
-    //       const account = accounts[0];
-    //       console.log("Found an authorized account: ", account);
-    //       setCurrentAccount(account);
-    //   } else {
-    //       console.log("No authorized account found");
-    //   }
-    // }
-
     const connectWalletHandler = async () => {
       const { ethereum } = window;
 
@@ -157,7 +204,7 @@ class App extends React.Component {
         });
         console.log("Found an account! Address: ", this.state.accounts[0]);
         this.setState({
-          currentAccount: this.state.accounts[0],
+          // currentAccount: this.state.accounts[0],
           accountConnected: true,
         });
       } catch (err) {
@@ -179,6 +226,8 @@ class App extends React.Component {
         // </Button>
       );
     };
+
+
 
     const transactionsTable = () => {
       return (
@@ -215,6 +264,30 @@ class App extends React.Component {
       );
     };
 
+    const checkWalletIsConnected = async () => {  // IMPORTANT NOTE: THIS FUNCTION IS DUPLICATED ABOVE AS WELL. SO ANY CHANGES MUST BE DONE twice.
+      if (!window.ethereum) {
+          console.log("Make sure you have Metamask installed!");
+          return;
+      } else {
+          // console.log("Wallet exists! We're ready to go!")
+      }
+
+      let accounts = await window.ethereum.request({ method: 'eth_accounts' });
+
+      var partnerConn = await multisig.methods.isPartner(accounts[0]).call();
+
+      if (accounts.length !== 0) {
+        this.setState({
+          partnerWalletConnected: partnerConn,
+          // currentAccount: this.state.accounts[0],
+          accountConnected: true,
+        });
+      } else {
+          console.log("No authorized account found");
+      }
+    }
+
+
     const handleChangeTo = (event) => {
       this.setState({ inputTo: event.target.value });
     };
@@ -238,30 +311,39 @@ class App extends React.Component {
         this.state.inputTo,
         this.state.inputVal
       );
-      try {
-        let x = BigNumber.from("1000000000000");
-        let multiplier = 1000000 * this.state.inputVal; // convert fractional eth value to non-fraction by multiplying by 10^6 so that in can be read by BN.
-        let y = x.mul(multiplier);
-        await multisig.methods
-          .addTransaction(
-            this.state.inputTo,
-            y,
-            this.state.inputData,
-            this.state.inputDesc
-          )
-          .send({
-            gas: "3000000",
-            from: this.state.accounts[0],
+      await checkWalletIsConnected();
+      if(this.state.partnerWalletConnected)
+      {
+        try {
+          let x = BigNumber.from("1000000000000");
+          let multiplier = 1000000 * this.state.inputVal; // convert fractional eth value to non-fraction by multiplying by 10^6 so that in can be read by BN.
+          let y = x.mul(multiplier);
+          let accs = await window.ethereum.request({ method: 'eth_accounts' });
+          await multisig.methods
+            .addTransaction(
+              this.state.inputTo,
+              y,
+              this.state.inputData,
+              this.state.inputDesc
+            )
+            .send({
+              gas: "3000000",
+              from: accs[0],
+            });
+          console.log("Transaction added");
+        } catch (err) {
+          console.log("Error in submitting : ", err);
+          this.setState({
+            inputDesc: "",
+            inputVal: 0,
+            inputData: "",
+            inputTo: "",
           });
-        console.log("Transaction added");
-      } catch (err) {
-        console.log("Error in submitting : ", err);
-        this.setState({
-          inputDesc: "",
-          inputVal: 0,
-          inputData: "",
-          inputTo: "",
-        });
+        }
+      }
+      else
+      {
+        console.log("Sorry. Non-partner cannot add transactions.");
       }
       event.preventDefault();
     };
@@ -318,6 +400,93 @@ class App extends React.Component {
         </Form>);
     }
 
+    const checkIfTxnsCanBeExec = async () => {
+      // console.log(this.state.executableTxns);
+      for(var ch = 0 ; ch < this.state.c_Txns.length; ch++)
+      {
+        if(Object.keys(this.state.saved_signs[ch]).length >= this.state.minVotes)
+        {
+          // console.log("saved_signs[ch].length >= minVotes: ", Object.keys(this.state.saved_signs[ch]).length, ">=", this.state.minVotes);
+          this.state.executableTxns.push(
+            [
+              "Txn " + ch.toString(),
+              "",
+              <Button text={"Execute Txn "+ch.toString()} onClick={
+                async (e)=>{
+                  let accs = await window.ethereum.request({ method: 'eth_accounts' });
+                  checkWalletIsConnected();
+
+                  var txt = e.target.innerText;
+                  var txn_index = txt.slice(12, txt.length);
+                  console.log("Txn_index", txn_index);
+                  const _v = [];
+                  const _r = [];
+                  const _s = [];
+
+                  for(var c = 0 ; c < Object.keys(this.state.saved_signs[txn_index]).length; c++)
+                  {
+                    // console.log("Entered");
+                    var key1= Object.keys(this.state.saved_signs[txn_index])[c];
+                    const signature = this.state.saved_signs[txn_index][key1];
+                    // console.log("Parsing through signatures ", signature);
+                    const r = signature.slice(0, 66);
+                    const s = "0x" + signature.slice(66, 130);
+                    const v = parseInt(signature.slice(130, 132), 16);
+                    // console.log({v,r,s});
+                    _v.push(v);
+                    _r.push(r);
+                    _s.push(s);
+                  }
+                  // console.log({c});
+                  console.log({accs});
+                  await multisig.methods.executeTransaction(
+                    txn_index,
+                    _v,
+                    _r,
+                    _s,
+                    c
+                  ).send({
+                    gas: 3000000,
+                    from: accs[0],
+                  });
+                  this.componentDidMount(); // to remove txm from table
+                  checkIfTxnsCanBeExec();
+                }
+              }/>
+            ]
+          )
+        }
+        // console.log(this.state.executableTxns);
+        this.setState({
+          executableTxnsBOOL : true
+        }
+        );
+      }
+    }
+
+    const executeTxns = ()=>{
+      return (
+        <Table
+          columnsConfig="2fr 1fr 2fr"
+          data={
+            this.state.executableTxnsBOOL
+              ? this.state.executableTxns
+              : [
+                ["", "", ""]
+              ]
+          }
+          header={[
+            <span>Txn ID</span>,
+            <span></span>,
+            <span>Action</span>,
+          ]}
+          maxPages={3}
+          onPageNumberChanged={function noRefCheck() {}}
+          pageSize={5}
+        />
+      );
+    }
+
     return (
       <div className="container">
         <div className="title">
@@ -325,13 +494,21 @@ class App extends React.Component {
         </div>
         <div className="connect">
           {this.state.accountConnected ? (
-            <h3>Wallet connected</h3>
+            <h3>{this.state.partnerWalletConnected ? "Partner" : "Non-partner" } Wallet connected</h3>
           ) : (
             connectWalletButton()
           )}
         </div>
         <div className="tab">{transactionsTable()}</div>
         <div className="formArea">{addTxnForm()}</div>
+        <div className="exec flex-container">
+          <div>
+            <h4>Txns that can be executed    .................................    -</h4>
+            <Button onClick={checkIfTxnsCanBeExec} text="Check Now"/>
+          </div>
+          {/* <h4>.............</h4> */}
+          {executeTxns()}
+          </div>
         <div className="textExplain">
         <h3>How to use the multisig ?</h3>
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."

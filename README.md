@@ -33,3 +33,12 @@ Approving ytansactions and proposing txns is now possible. Things left to add ar
 i. error handling
 ii. Executing txns once neccessary amounr of votes is achieved
 iii. Storing the signs off-chain (better, on servers)
+
+
+##### 20 March
+
+Executing transactions is now possible from the website. After execution, the transaction is deleted from the wallet. Sign are stored in state.
+i. when adding partners ensure that a partner address is unique (needs to be done in smart contract)
+ii. error handling
+iii. A lot of gas optimisation for execution function.
+iv. We need to ensure that the partner addresses are unique when adding a new partner.
