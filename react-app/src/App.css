@@ -44,7 +44,7 @@
   grid-template-rows: 1fr 3fr 2fr 1fr;
   align-content: start;
   grid-template-areas:
-    " . . . title . . connect"
+    " contractAddr . . title . . connect"
     " formArea formArea tab tab tab tab tab "
     " exec exec exec exec exec exec exec"
     " txtX txtX txtX txtX txtX txtX txtX";
@@ -94,5 +94,10 @@
 
 .exec{
   grid-area: exec;
+  justify-self: start;
+}
+
+.contractAddr{
+  grid-area: contractAddr;
   justify-self: start;
 }

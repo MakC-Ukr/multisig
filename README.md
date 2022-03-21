@@ -1,44 +1,19 @@
-# Multisig wallet
+# Multisig
 
-### What will I be trying to build: 
+A simple multisig wallet that allows multiple accoutns to sign transactions and stores this data off-chain. Once enough votes are received (the threshold is defined in the smart contract), any partner of the multisig can execute the transaction on-chain. 
 
-The plan to start working on this.
+The project has a usable website UI, proper error handling and gas optimised smart contract. It is assumed in the Solidity code that the number of partners will be small (in single or double digits) for gas optimisation purposes. 
 
-1 . Create a smart contract that has the following functions:
-      a. Add a transaction by passing to, value and hex-data
-      b. Sign a transaction without paying gas (i.e. use private key for signing)
-      c. Initiate an approved transaction by passing all the signed messages (which we had stored off-chain when each owner approved it). The txn would involve gas fees obviously, but the smart contract also checks that each of the signs that we pass as parameters is valid (i.e. the user which signed it is an owner). The smart contract checks the same by using "ecrecover".
+#### To test it out: 
+1. Clone the repo from GitHub
+2. Open "react-app" directory
+3. Run "npm install" command in Terminal
+4. Run "npm start" command in Terminal.
 
+However, note that for testing you will have to deploy a new smart contract where you are the owner and can make other wallets partners. Otherwise, contact the owner to make you a partner in the smart contract.
 
-2. Once we have the smart contract we simply need to make sure the frontend has buttons for these functions. And we store the signed messages in a simple array/hashmap.
+###### Contract address: 0x53ac59368fde73A45dEa3f9ccEB3fd4563DEC20e 
 
-
-##### 18 March
-
-Created a react app to show connect wallet button, and a smart contracy which stores the txns on chain. 
-
-The next steps are to connect the smart contract to out frontend and start reading transactions in order to display them. 
-
-
-##### 19 March
-Added signing functionality to frontend. Connect Wallet button is also present.
-
-i. Proper error handling is missing. An error renders all the buttons to be not clickable. Use notifications for that
-ii. A form to add transactions is also missing. 
-
-
-##### 19 March. Part two.
-
-Approving ytansactions and proposing txns is now possible. Things left to add are:
-i. error handling
-ii. Executing txns once neccessary amounr of votes is achieved
-iii. Storing the signs off-chain (better, on servers)
-
-
-##### 20 March
-
-Executing transactions is now possible from the website. After execution, the transaction is deleted from the wallet. Sign are stored in state.
-i. when adding partners ensure that a partner address is unique (needs to be done in smart contract)
-ii. error handling
-iii. A lot of gas optimisation for execution function.
-iv. We need to ensure that the partner addresses are unique when adding a new partner.
+#### Terminology
+Partner: those wallets whose signs are needed for execution
+Owner:: the single wallet which deployed the contract (0x318Edb8407bc022556989429EAC679F1e4001B5c)

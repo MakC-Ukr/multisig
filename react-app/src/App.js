@@ -11,13 +11,13 @@ import {
   Button,
   Tag,
   Icon,
+  NotificationProvider,
 } from "web3uikit";
 import { render } from "@testing-library/react";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "shards-ui/dist/css/shards.min.css";
-import { Form, FormInput, FormGroup, FormTextarea } from "shards-react";
+import { Form, FormInput, FormGroup, Alert } from "shards-react";
 import { BigNumber } from "ethers";
-import { sign } from "crypto";
 
 let web3;
 
@@ -30,8 +30,6 @@ if (typeof window !== "undefined" && typeof window.ethereum !== "undefined") {
   );
   web3 = new Web3(provider);
 }
-
-
 
 class App extends React.Component {
   constructor(props) {
@@ -47,13 +45,15 @@ class App extends React.Component {
       inputVal: 0,
       inputData: "",
       inputTo: "",
-      saved_signs:[],
+      saved_signs: [],
       qtySaved_signs: 0,
-      partnerAddresses :[],
+      partnerAddresses: [],
       partnerWalletConnected: false,
       minVotes: 0,
       executableTxns: [],
       executableTxnsBOOL: false,
+      alertValid: false,
+      alertText: "",
     };
     this.componentDidMount = this.componentDidMount.bind(this);
   }
@@ -70,29 +70,29 @@ class App extends React.Component {
     // console.log(z);
     var self = this;
     async function fetchContractData() {
-      var minVotesNeeded = await multisig.methods.minVotes().call();
-      var c_qtyTxn = await multisig.methods.qtyTxn().call();
-      // console.log("c_qtyTxn: ", c_qtyTxn);
-      for (var i = 0; i < c_qtyTxn; i++) {
-        self.state.saved_signs.push({});
-        self.state.qtySaved_signs = self.state.qtySaved_signs+1;
-        self.state.c_Txns[i] = await multisig.methods.txns(i).call();
-        self.state.txns_frontend[i] = [
-          <CryptoLogos
-            chain="ethereum"
-            onClick={function noRefCheck() {}}
-            size="48px"
-          />,
-          self.state.c_Txns[i]["desc"],
-          self.state.c_Txns[i]["to"],
-          self.state.c_Txns[i]["val"],
-          <Button
-            onClick={async (e) => {
+      try {
+        var minVotesNeeded = await multisig.methods.minVotes().call();
+        var c_qtyTxn = await multisig.methods.qtyTxn().call();
+        // console.log("c_qtyTxn: ", c_qtyTxn);
+        for (var i = 0; i < c_qtyTxn; i++) {
+          self.state.saved_signs.push({});
+          self.state.qtySaved_signs = self.state.qtySaved_signs + 1;
+          self.state.c_Txns[i] = await multisig.methods.txns(i).call();
+          self.state.txns_frontend[i] = [
+            <CryptoLogos
+              chain="ethereum"
+              onClick={function noRefCheck() {}}
+              size="48px"
+            />,
+            self.state.c_Txns[i]["desc"],
+            self.state.c_Txns[i]["to"],
+            self.state.c_Txns[i]["val"],
+            <Button
+              onClick={async (e) => {
+                try {
                   await checkWalletIsConnected();
-                  if(self.state.partnerWalletConnected)
-                  {
-                    try
-                    {
+                  if (self.state.partnerWalletConnected) {
+                    try {
                       // console.log(e.target);
                       var txt = e.target.innerText;
                       var txn_index = txt.slice(12, txt.length);
@@ -104,14 +104,16 @@ class App extends React.Component {
                       const temp_val =
                         self.state.c_Txns[txt.slice(12, txt.length)]["val"];
                       const message = web3.eth.abi.encodeParameters(
-                        ['address', 'uint256','bytes'],
+                        ["address", "uint256", "bytes"],
                         [temp_to, temp_val, temp_data]
                       );
                       // const message = /*temp_to + temp_val +*/ temp_data;
-                      console.log({message});
+                      // console.log({ message });
                       const hashedMessage = web3.utils.sha3(message);
-                      console.log({hashedMessage});
-                      let accs = await window.ethereum.request({ method: 'eth_accounts' });
+                      // console.log({ hashedMessage });
+                      let accs = await window.ethereum.request({
+                        method: "eth_accounts",
+                      });
                       const signature = await window.ethereum.request({
                         method: "personal_sign",
                         params: [hashedMessage, accs[0]],
@@ -125,45 +127,61 @@ class App extends React.Component {
                       // console.log("Added signature: ", signature, " signed by ", accs[0], " to txn_index: ", txn_index);
                       // console.log("Saved_signs is now : ", self.state.saved_signs);
                       // console.log({ r, s, v });
-                    }
-                    catch(err)
-                    {
+                    } catch (err) {
                       console.log(err);
+                      self.setState({
+                        alertValid: true,
+                        alertText: "Approval Not succeful",
+                      });
                     }
+                  } else {
+                    console.log(
+                      "Sorry. Non-partner cannot approve transactions."
+                    );
+                    self.setState({
+                      alertValid: true,
+                      alertText:
+                        "Sorry. Non-partner cannot approve transactions.",
+                    });
                   }
-                  else
-                  {
-                    console.log("Sorry. Non-partner cannot approve transactions.");
-                  }
-              }
-            }
-            text={"Approve txn " + i}
-          />,
-        ];
+                } catch (err) {
+                  console.log(err);
+                  self.setState({
+                    alertValid: true,
+                    alertText: "Approving Not succesful",
+                  });
+                }
+              }}
+              text={"Approve txn " + i}
+            />,
+          ];
+        }
+
+        var c_qtyPartners = await multisig.methods.n_partners().call();
+        for (var q = 0; q < c_qtyPartners; q++) {
+          var _addr = await multisig.methods.partners(q).call();
+          self.state.partnerAddresses.push(_addr);
+        }
+        // console.log("Partners loaded: ", self.state.partnerAddresses);
+        self.setState({ txns_loaded: true, minVotes: minVotesNeeded });
+      } catch (err) {
+        console.log(err);
+        this.setState({
+          alertValid: true,
+          alertText: "Fetching contract Data Unsuccesful. Connect wallet and reload the website.",
+        });
       }
-
-      var c_qtyPartners = await multisig.methods.n_partners().call();
-      for(var q = 0 ; q < c_qtyPartners; q++)
-      {
-        var _addr = await multisig.methods.partners(q).call();
-        self.state.partnerAddresses.push(_addr);
-      }
-      
-      // console.log("Partners loaded: ", self.state.partnerAddresses);
-
-      self.setState({ txns_loaded: true, minVotes: minVotesNeeded });
-
     }
 
     const checkWalletIsConnected = async () => {
       if (!window.ethereum) {
-          console.log("Make sure you have Metamask installed!");
-          return;
+        console.log("Make sure you have Metamask installed!");
+        return;
       } else {
-          // console.log("Wallet exists! We're ready to go!")
+        // console.log("Wallet exists! We're ready to go!")
       }
 
-      let accounts = await window.ethereum.request({ method: 'eth_accounts' });
+      let accounts = await window.ethereum.request({ method: "eth_accounts" });
 
       var partnerConn = await multisig.methods.isPartner(accounts[0]).call();
 
@@ -174,30 +192,19 @@ class App extends React.Component {
           accountConnected: true,
         });
       } else {
-          console.log("No authorized account found");
+        console.log("No authorized account found");
       }
-    }
-
-    
-  
+    };
     // checkIfTxnsCanBeExec();
     checkWalletIsConnected();
     fetchContractData();
   }
-
-
-
-  
-
-
   render() {
     const connectWalletHandler = async () => {
       const { ethereum } = window;
-
       if (!ethereum) {
         alert("Please install Metamask!");
       }
-
       try {
         this.state.accounts = await ethereum.request({
           method: "eth_requestAccounts",
@@ -209,6 +216,10 @@ class App extends React.Component {
         });
       } catch (err) {
         console.log(err);
+        this.setState({
+          alertValid: true,
+          alertText: "Connect wallet first",
+        });
       }
     };
 
@@ -226,8 +237,6 @@ class App extends React.Component {
         // </Button>
       );
     };
-
-
 
     const transactionsTable = () => {
       return (
@@ -264,29 +273,29 @@ class App extends React.Component {
       );
     };
 
-    const checkWalletIsConnected = async () => {  // IMPORTANT NOTE: THIS FUNCTION IS DUPLICATED ABOVE AS WELL. SO ANY CHANGES MUST BE DONE twice.
+    const checkWalletIsConnected = async () => {
+      // IMPORTANT NOTE: THIS FUNCTION IS DUPLICATED ABOVE AS WELL. SO ANY CHANGES MUST BE DONE twice.
       if (!window.ethereum) {
-          console.log("Make sure you have Metamask installed!");
-          return;
+        console.log("Make sure you have Metamask installed!");
+        this.setState({
+          alertValid: true,
+          alertText: "Make sure you have Metamask installed!",
+        });
+        return;
       } else {
-          // console.log("Wallet exists! We're ready to go!")
+        // console.log("Wallet exists! We're ready to go!")
       }
-
-      let accounts = await window.ethereum.request({ method: 'eth_accounts' });
-
+      let accounts = await window.ethereum.request({ method: "eth_accounts" });
       var partnerConn = await multisig.methods.isPartner(accounts[0]).call();
-
       if (accounts.length !== 0) {
         this.setState({
           partnerWalletConnected: partnerConn,
-          // currentAccount: this.state.accounts[0],
           accountConnected: true,
         });
       } else {
-          console.log("No authorized account found");
+        console.log("No authorized account found");
       }
-    }
-
+    };
 
     const handleChangeTo = (event) => {
       this.setState({ inputTo: event.target.value });
@@ -312,13 +321,12 @@ class App extends React.Component {
         this.state.inputVal
       );
       await checkWalletIsConnected();
-      if(this.state.partnerWalletConnected)
-      {
+      if (this.state.partnerWalletConnected) {
         try {
           let x = BigNumber.from("1000000000000");
           let multiplier = 1000000 * this.state.inputVal; // convert fractional eth value to non-fraction by multiplying by 10^6 so that in can be read by BN.
           let y = x.mul(multiplier);
-          let accs = await window.ethereum.request({ method: 'eth_accounts' });
+          let accs = await window.ethereum.request({ method: "eth_accounts" });
           await multisig.methods
             .addTransaction(
               this.state.inputTo,
@@ -338,180 +346,240 @@ class App extends React.Component {
             inputVal: 0,
             inputData: "",
             inputTo: "",
+            alertValid: true,
+            alertText: "Error in submitting",
           });
         }
-      }
-      else
-      {
+      } else {
         console.log("Sorry. Non-partner cannot add transactions.");
       }
       event.preventDefault();
     };
 
     const addTxnForm = () => {
-      return (<Form>
-        <FormGroup>
-          <label htmlFor="#to">To:</label>
-          <FormInput
-            id="#to"
-            placeholder="Address: 0x....92"
-            value={this.state.inputTo}
-            onChange={handleChangeTo}
-          />
-        </FormGroup>
-        <FormGroup>
-          <label htmlFor="#val">Value in Eth</label>
-          <FormInput
-            id="#val"
-            placeholder="1.5"
-            value={this.state.inputVal}
-            onChange={handleChangeVal}
-          />
-        </FormGroup>
-        <FormGroup>
-          <label htmlFor="#data">Txn Hash</label>
-          <FormInput
-            id="#data"
-            placeholder="0x...0002"
-            value={this.state.inputData}
-            onChange={handleChangeData}
-          />
-        </FormGroup>
-        
-        <FormGroup>
-          <label htmlFor="#desc">Txn Description </label>
-          <FormInput
-            id="#desc"
-            placeholder="1Inch Eth->Dai swap"
-            value={this.state.inputDesc}
-            onChange={handleChangeDesc}
-          />
-        </FormGroup>
-        <div>
-          <Button
-            id="test-button-colored-yellow"
-            onClick={handleSubmit}
-            text="Add Txn"
-            theme="colored"
-            color="yellow"
-            type="button"
-          />
-        </div>
-        </Form>);
-    }
+      return (
+        <Form>
+          <FormGroup>
+            <label htmlFor="#to">To:</label>
+            <FormInput
+              id="#to"
+              placeholder="Address: 0x....92"
+              value={this.state.inputTo}
+              onChange={handleChangeTo}
+            />
+          </FormGroup>
+          <FormGroup>
+            <label htmlFor="#val">Value in Eth</label>
+            <FormInput
+              id="#val"
+              placeholder="1.5"
+              value={this.state.inputVal}
+              onChange={handleChangeVal}
+            />
+          </FormGroup>
+          <FormGroup>
+            <label htmlFor="#data">Txn Hash</label>
+            <FormInput
+              id="#data"
+              placeholder="0x...0002"
+              value={this.state.inputData}
+              onChange={handleChangeData}
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <label htmlFor="#desc">Txn Description </label>
+            <FormInput
+              id="#desc"
+              placeholder="1Inch Eth->Dai swap"
+              value={this.state.inputDesc}
+              onChange={handleChangeDesc}
+            />
+          </FormGroup>
+          <div>
+            <Button
+              id="test-button-colored-yellow"
+              onClick={handleSubmit}
+              text="Add Txn"
+              theme="colored"
+              color="yellow"
+              type="button"
+            />
+          </div>
+        </Form>
+      );
+    };
 
     const checkIfTxnsCanBeExec = async () => {
       // console.log(this.state.executableTxns);
-      for(var ch = 0 ; ch < this.state.c_Txns.length; ch++)
-      {
-        if(Object.keys(this.state.saved_signs[ch]).length >= this.state.minVotes)
-        {
+      for (var ch = 0; ch < this.state.c_Txns.length; ch++) {
+        if (
+          Object.keys(this.state.saved_signs[ch]).length >= this.state.minVotes
+        ) {
           // console.log("saved_signs[ch].length >= minVotes: ", Object.keys(this.state.saved_signs[ch]).length, ">=", this.state.minVotes);
-          this.state.executableTxns.push(
-            [
-              "Txn " + ch.toString(),
-              "",
-              <Button text={"Execute Txn "+ch.toString()} onClick={
-                async (e)=>{
-                  let accs = await window.ethereum.request({ method: 'eth_accounts' });
-                  checkWalletIsConnected();
+          this.state.executableTxns.push([
+            "Txn " + ch.toString(),
+            "",
+            <Button
+              text={"Execute Txn " + ch.toString()}
+              onClick={async (e) => {
+                try{
+                let accs = await window.ethereum.request({
+                  method: "eth_accounts",
+                });
+                checkWalletIsConnected();
 
-                  var txt = e.target.innerText;
-                  var txn_index = txt.slice(12, txt.length);
-                  console.log("Txn_index", txn_index);
-                  const _v = [];
-                  const _r = [];
-                  const _s = [];
+                var txt = e.target.innerText;
+                var txn_index = txt.slice(12, txt.length);
+                console.log("Txn_index", txn_index);
+                const _v = [];
+                const _r = [];
+                const _s = [];
 
-                  for(var c = 0 ; c < Object.keys(this.state.saved_signs[txn_index]).length; c++)
-                  {
-                    // console.log("Entered");
-                    var key1= Object.keys(this.state.saved_signs[txn_index])[c];
-                    const signature = this.state.saved_signs[txn_index][key1];
-                    // console.log("Parsing through signatures ", signature);
-                    const r = signature.slice(0, 66);
-                    const s = "0x" + signature.slice(66, 130);
-                    const v = parseInt(signature.slice(130, 132), 16);
-                    // console.log({v,r,s});
-                    _v.push(v);
-                    _r.push(r);
-                    _s.push(s);
-                  }
-                  // console.log({c});
-                  console.log({accs});
-                  await multisig.methods.executeTransaction(
-                    txn_index,
-                    _v,
-                    _r,
-                    _s,
-                    c
-                  ).send({
+                for (
+                  var c = 0;
+                  c < Object.keys(this.state.saved_signs[txn_index]).length;
+                  c++
+                ) {
+                  // console.log("Entered");
+                  var key1 = Object.keys(this.state.saved_signs[txn_index])[c];
+                  const signature = this.state.saved_signs[txn_index][key1];
+                  // console.log("Parsing through signatures ", signature);
+                  const r = signature.slice(0, 66);
+                  const s = "0x" + signature.slice(66, 130);
+                  const v = parseInt(signature.slice(130, 132), 16);
+                  // console.log({v,r,s});
+                  _v.push(v);
+                  _r.push(r);
+                  _s.push(s);
+                }
+                // console.log({c});
+                console.log({ accs });
+                await multisig.methods
+                  .executeTransaction(txn_index, _v, _r, _s, c)
+                  .send({
                     gas: 3000000,
                     from: accs[0],
                   });
-                  this.componentDidMount(); // to remove txm from table
-                  checkIfTxnsCanBeExec();
+                // this.componentDidMount(); // to remove txm from table
+                // checkIfTxnsCanBeExec();
+                this.setState();
                 }
-              }/>
-            ]
-          )
+                catch(err)
+                {
+                  console.log(err);
+                  this.setState({
+                    alertValid: true,
+                    alertText: "Approval Not succeful",
+                  });
+                }
+              }}
+            />,
+          ]);
         }
         // console.log(this.state.executableTxns);
         this.setState({
-          executableTxnsBOOL : true
-        }
-        );
+          executableTxnsBOOL: true,
+        });
       }
-    }
+    };
 
-    const executeTxns = ()=>{
+    const executeTxns = () => {
       return (
         <Table
           columnsConfig="2fr 1fr 2fr"
           data={
             this.state.executableTxnsBOOL
               ? this.state.executableTxns
-              : [
-                ["", "", ""]
-              ]
+              : [["", "", ""]]
           }
-          header={[
-            <span>Txn ID</span>,
-            <span></span>,
-            <span>Action</span>,
-          ]}
+          header={[<span>Txn ID</span>, <span></span>, <span>Action</span>]}
           maxPages={3}
           onPageNumberChanged={function noRefCheck() {}}
           pageSize={5}
         />
       );
-    }
+    };
+
+    const showAlert = (txt) => {
+      return (
+        <Alert theme="warning">
+          {txt.toString()}
+          <button onClick={
+            ()=>{
+              this.setState({
+                alertValid: false,
+                alertText: "",
+              });
+            }
+          }>
+          <Icon fill="#000000" size={24} svg="triangleUp" />
+          </button>
+        </Alert>
+      );
+    };
 
     return (
-      <div className="container">
-        <div className="title">
-          <h1>Multisig</h1>
-        </div>
-        <div className="connect">
-          {this.state.accountConnected ? (
-            <h3>{this.state.partnerWalletConnected ? "Partner" : "Non-partner" } Wallet connected</h3>
-          ) : (
-            connectWalletButton()
-          )}
-        </div>
-        <div className="tab">{transactionsTable()}</div>
-        <div className="formArea">{addTxnForm()}</div>
-        <div className="exec flex-container">
-          <div>
-            <h4>Txns that can be executed    .................................    -</h4>
-            <Button onClick={checkIfTxnsCanBeExec} text="Check Now"/>
+      <div>
+        {this.state.alertValid ? showAlert(this.state.alertText) : ""}
+        <div className="container">
+          <div className="contractAddr">
+            <a
+              href={
+                "https://rinkeby.etherscan.io/address/" +
+                multisig.options.address
+              }
+              target="_blank"
+            >
+              <Button
+                id="test-button-outline"
+                onClick={function noRefCheck() {}}
+                text={"Contract: " + multisig.options.address}
+                theme="outline"
+                type="button"
+              />
+            </a>
           </div>
-          {/* <h4>.............</h4> */}
-          {executeTxns()}
+          <div className="title">
+            <h1>Multisig</h1>
           </div>
-        <div className="textExplain">
-        <h3>How to use the multisig ?</h3>
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum."
+          <div className="connect">
+            {this.state.accountConnected ? (
+              <h3>
+                {this.state.partnerWalletConnected ? "Partner" : "Non-partner"}{" "}
+                Wallet connected
+              </h3>
+            ) : (
+              connectWalletButton()
+            )}
+          </div>
+          <div className="tab">{transactionsTable()}</div>
+          <div className="formArea">{addTxnForm()}</div>
+          <div className="exec flex-container">
+            <div>
+              <h4>
+                Txns that can be executed ................................. -
+              </h4>
+              <Button onClick={checkIfTxnsCanBeExec} text="Check Now" />
+            </div>
+            {executeTxns()}
+            <h1>.</h1>
+            <div>
+              <h5></h5>
+              <h5></h5>
+              <h5>Votes Needed for confirmation: {this.state.minVotes}</h5>
+            </div>
+          </div>
+          <div className="textExplain">
+            <h3>How to use the multisig ?</h3>
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+            eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
+            ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+            aliquip ex ea commodo consequat. Duis aute irure dolor in
+            reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla
+            pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
+            culpa qui officia deserunt mollit anim id est laborum."
+          </div>
         </div>
       </div>
     );

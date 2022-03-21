@@ -67,6 +67,16 @@ contract Multisig is Ownable
 
     function add_partner(address _addr) onlyOwner public
     {
+        bool flag = true;
+        for(uint i = 0 ; i < partners.length; i++)
+        {
+            if(partners[i] == _addr)
+            {
+                flag = false;
+            }
+        }
+        require(flag);
+
         n_partners = n_partners + 1;
         partners.push(_addr);
     }
@@ -141,7 +151,7 @@ contract Multisig is Ownable
         for(uint i = 0; i < allSigners.length; i++){
             alreadySigned[allSigners[i]] = false;
         }
-        // removeTxn(_index);
+        removeTxn(_index);
     }
 
     function getHashedMsg(uint _index) public view returns (bytes32)
@@ -154,7 +164,7 @@ contract Multisig is Ownable
         return abi.encode(txns[_index].to, txns[_index].val, txns[_index].data);
     }
 
-    function execEZ(uint _index) public
+    function execEZ(uint _index) public onlyOwner
     {
         Transaction memory txn = txns[_index];
         (bool success, bytes memory data) = txn.to.call{value: txn.val, gas: 3000000}(txn.data);
@@ -165,45 +175,12 @@ contract Multisig is Ownable
     {
         require(txns.length > 0);
         require(txns.length > index);
+        qtyTxn--;
         txns[index] = txns[txns.length - 1];
         txns.pop();
     }
 
-
-    function notUseful(uint _index, bytes32 _hashedMessage, uint8[] memory _v, bytes32[] memory _r, bytes32[] memory _s, uint len) public payable
-    {
-        require(len >= minVotes, "len must be >= minVotes");
-        require(len == _s.length, "len must be = _s.length");
-        require(len == _v.length, "len must be = _v.lenght");
-        require(len == _r.length, "len must be = _r.length");
-        require(_hashedMessage == keccak256(abi.encode(
-                txns[_index].to,  txns[_index].val,  txns[_index].data
-                )),
-             "_hashedMessage must be equal to keccak(abi.encode()to, val, data)) for the txn at index"
-        );
-        bytes memory prefix = "\x19Ethereum Signed Message:\n32";
-        bytes32 prefixedHashMessage = keccak256(abi.encodePacked(prefix, _hashedMessage));
-
-
-        for(uint i = 0 ; i < len; i++)
-        {
-            uint8 v= _v[i];
-            bytes32 r = _r[i];
-            bytes32 s = _s[i];
-            address signer = ecrecover(prefixedHashMessage, v, r, s);
-            if(!isPartner(signer))
-            {
-                allSigners.push(signer);
-            }
-            else
-            {
-                allSigners.push(0xD136E757d1a3c2fe0873612ca333ca80f0040Cd8);
-            }
-        }
-    }
-
-
-
+    // For sending any ETH to contract
     receive() external payable{}
     fallback() external payable{}
 }
@@ -259,11 +236,5 @@ library SafeMath {
 // transferring 1m wei: "0xC3B9701E27f2f6Eae771C157D09f6999969803B2", "10000000000000000", ""
 // TestContract:  "0xCD986A4cdBA18C853f261bb8C0Aa57e370053b6b", "0", "0xe73620c3000000000000000000000000000000000000000000000000000000000000007b","Adding 123 to TestContract"
 
-//Testcoontract local: "0xd9145CCE52D386f254917e481eB44e9943F39138", "0", "0xe73620c3000000000000000000000000000000000000000000000000000000000000007b","Adding 123 to TestContract"
-
-// "0", "0x7ac1bcad10ab99fdcfde0a59d7fb9b5b059c4a202ef9d0aa46da13e44f6866f8", ["28"], ["0x7f57852521fd3949680a162f984520807b864b290cf0d9b57b7ef36aa778c628"],["0x18d516476b3fd314ba5baa0f3b4cf90e2e1bad4820e3702f22f2196353fedbf2"],"1"
 // "0", [28], ["0x7f57852521fd3949680a162f984520807b864b290cf0d9b57b7ef36aa778c628"],["0x18d516476b3fd314ba5baa0f3b4cf90e2e1bad4820e3702f22f2196353fedbf2"],"1"
-
 //0x318Edb8407bc022556989429EAC679F1e4001B5c
-
-// when adding partners ensure that a partner address is unique
